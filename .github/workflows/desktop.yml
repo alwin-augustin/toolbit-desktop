@@ -39,6 +39,12 @@ jobs:
     name: ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
+    # The draft release on a tag is created with `GITHUB_TOKEN`, so this job needs
+    # write access to repository contents. The workflow-level `contents: read`
+    # above is not enough on its own: without this the release step fails with
+    # "Resource not accessible by integration".
+    permissions:
+      contents: write
 
     strategy:
       fail-fast: false
