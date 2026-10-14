@@ -41,6 +41,12 @@ npm run icons                   # regenerate src-tauri/icons from the web app's 
 packaging. There is no second copy of the UI to keep in step: `frontendDist`
 points straight at `Web/web/dist`.
 
+`npm run verify` needs a real desktop session — it opens a window and asks the
+webview what it rendered, so it reports "did not report within 20s" when run from
+a context with no window server (a plain SSH shell, or a sandboxed agent). It
+skips the single-instance plugin on purpose: registered normally, a verify run
+would hand off to an instance that is already open, exit 0 and prove nothing.
+
 Closing the loop after a UI change means `npm run build` here, not just
 `npm run build` in `Web/web` — the packaged app is the only place the system
 webviews (WKWebView, WebView2, WebKitGTK) are exercised.
@@ -120,10 +126,18 @@ Nothing else changes: same tokens, same `wb-*` primitives, same screens.
 The page is also locked down: `security.csp` allows bundled assets only, one
 inline-style escape hatch for CodeMirror (and Tailwind's runtime style
 injection), and Tauri's IPC origin. No remote origin is reachable, so a tool
-cannot start talking to the network even if it wanted to.
+cannot start talking to the network even if it wanted to. See the caveat under
+Limits — this is configured, not yet observed.
 
 ## Limits and next steps
 
+- **The CSP is set but has not been execution-verified.** It allows bundled
+  assets, CodeMirror's injected styles and Tauri's IPC origin, and no remote
+  origin — but it has only ever been reasoned about, not run, because the machine
+  it was written on had no desktop session. Run `npm run verify` from a terminal
+  on a desktop (it now also asserts that the page can reach the shell's event
+  API, which is what a too-strict CSP breaks) before shipping, and drop back to
+  `"csp": null` if it misbehaves.
 - **Only macOS has been run.** The shell compiles for all three targets, but
   Windows and Linux builds have not been launched here. Test WebKitGTK
   rendering (fonts, canvas, NVIDIA/compositing quirks) on a Linux box before
@@ -131,9 +145,6 @@ cannot start talking to the network even if it wanted to.
 - **No updater yet.** `tauri-plugin-updater` needs a signing key pair and a
   static manifest; losing that key strands installed users, so it is a
   deliberate next step rather than a default.
-- **The CSP has not been exercised on Windows or Linux.** It allows Tauri's IPC
-  origin explicitly, but the macOS build is the only one it has been run against;
-  check the console on the other two before shipping.
 - **No signing.** Unsigned macOS builds cannot be distributed outside the
   developer's machine; unsigned Windows downloads trip SmartScreen. Apple
   Developer Program ($99/yr) and an OV certificate (~$150–300/yr) are the gate.

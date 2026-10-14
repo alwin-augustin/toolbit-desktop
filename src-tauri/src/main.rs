@@ -366,16 +366,24 @@ fn build_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<tau
 fn main() {
     let verifying = Verify::requested();
 
-    tauri::Builder::default()
-        // Must be registered first: it decides whether this process is the one
-        // that owns the window.
-        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+    let mut builder = tauri::Builder::default();
+
+    // A verify run has to own its own window. Registered normally it would
+    // delegate to an instance that is already running, and this process would
+    // exit 0 having tested nothing — a false pass, which is worse than having no
+    // check at all. Locally that is easy to hit: closing the window only hides
+    // it on macOS, so an instance is often still alive.
+    if !verifying {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             remember_paths(app, &argv);
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.set_focus();
             }
-        }))
+        }));
+    }
+
+    builder
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .manage(PendingOpen::default())
