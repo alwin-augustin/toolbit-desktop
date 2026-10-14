@@ -120,14 +120,18 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Signing is optional: without these the bundles are produced unsigned
-          # and the release step is skipped.
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Deliberately no Apple signing variables. Toolbit has no Developer ID
+          # certificate, and declaring the secrets while they are unset is worse
+          # than leaving them out: an empty `APPLE_CERTIFICATE` still reads as
+          # "import this certificate" to the Tauri CLI, and both macOS legs then
+          # die in the bundle step with
+          #   failed to bundle project: failed codesign application:
+          #   failed to run command security import: failed to import keychain certificate
+          # Add these back on the day there is a certificate to sign with —
+          # APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
+          # APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID — and the DMGs become signed
+          # and notarized, which is also what would let the app into homebrew/cask
+          # without the quarantine workaround.
         with:
           projectPath: ${{ env.SHELL_PATH }}
           args: --target ${{ matrix.target }}
