@@ -156,3 +156,8 @@ Limits — this is configured, not yet observed.
   will need a monotonic version here.
 - **A tray item for a future Quick Tool** is unbuilt — and until it exists,
   closing the window has to quit on Windows and Linux rather than hide.
+- **There is no formatting gate.** `cargo fmt --check` currently reports diffs in
+  `main.rs`, which is hand-formatted with a wider line than rustfmt's default;
+  adding the gate means either running `cargo fmt` once or committing a
+  `rustfmt.toml` with the width you actually use. CI checks compilation and tests
+  only.

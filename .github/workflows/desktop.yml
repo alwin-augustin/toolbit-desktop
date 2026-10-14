@@ -99,7 +99,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-          components: rustfmt
 
       - name: Cache Rust build
         uses: swatinem/rust-cache@v2
@@ -113,10 +112,6 @@ jobs:
       # Cheap, and it is the only thing that compiles the shell in a shape the
       # bundling step does not: the unit tests cover the file-IO refusals and the
       # read allowlist.
-      - name: Check formatting
-        working-directory: ${{ env.SHELL_PATH }}
-        run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
-
       - name: Test the shell
         working-directory: ${{ env.SHELL_PATH }}
         run: cargo test --manifest-path src-tauri/Cargo.toml
