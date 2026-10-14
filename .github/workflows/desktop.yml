@@ -1,0 +1,165 @@
+name: Desktop build
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Superseded runs on the same ref are wasted CI time on four platforms.
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+# This repo hosts only the native shell; the interface it bundles lives in the
+# web repo, which has to sit next to it because `tauri.conf.json` points
+# `frontendDist` at `../../../Web/web/dist`.
+#
+# That relative path is resolved against `src-tauri/` — so the two checkouts
+# below are not a style choice but the contract: the shell has to land at
+# `<workspace>/Desktop/desktop-tauri` and the workspace UI at `<workspace>/Web/web`
+# for `../../../Web/web/dist` (and `beforeBuildCommand`'s `../../Web/web`) to
+# resolve at all. Anything else fails the build with "the `frontendDist`
+# configuration is set to ... but this path doesn't exist".
+env:
+  WEB_REPOSITORY: alwin-augustin/toolbit
+  WEB_PATH: Web/web
+  SHELL_PATH: Desktop/desktop-tauri
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macOS (Apple silicon)
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - label: macOS (Intel)
+            os: macos-15-intel
+            target: x86_64-apple-darwin
+          - label: Windows
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - label: Linux (x86_64)
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+
+    steps:
+      - name: Checkout the desktop shell
+        uses: actions/checkout@v7
+        with:
+          path: ${{ env.SHELL_PATH }}
+
+      # The UI is built from the web repo rather than duplicated here, so a
+      # tool is written once and both targets pick it up.
+      - name: Checkout the web workspace
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ env.WEB_REPOSITORY }}
+          path: ${{ env.WEB_PATH }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: '${{ env.WEB_PATH }}/.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: |
+            ${{ env.WEB_PATH }}/package-lock.json
+            ${{ env.SHELL_PATH }}/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: ${{ env.WEB_PATH }}
+        run: npm ci
+
+      # Tauri's documented Debian/Ubuntu prerequisites. `libxdo-dev` and
+      # libayatana-appindicator3 are the ones that bite: omitting either fails
+      # the Linux link, and `libappindicator3` is the legacy spelling of the
+      # latter.
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget \
+            file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          components: rustfmt
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ env.SHELL_PATH }}/src-tauri
+
+      - name: Install the Tauri CLI
+        working-directory: ${{ env.SHELL_PATH }}
+        run: npm ci
+
+      # Cheap, and it is the only thing that compiles the shell in a shape the
+      # bundling step does not: the unit tests cover the file-IO refusals and the
+      # read allowlist.
+      - name: Check formatting
+        working-directory: ${{ env.SHELL_PATH }}
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+
+      - name: Test the shell
+        working-directory: ${{ env.SHELL_PATH }}
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Build the app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signing is optional: without these the bundles are produced unsigned
+          # and the release step is skipped.
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          projectPath: ${{ env.SHELL_PATH }}
+          args: --target ${{ matrix.target }}
+          tagName: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+          releaseName: ${{ startsWith(github.ref, 'refs/tags/v') && format('Toolbit {0}', github.ref_name) || '' }}
+          releaseDraft: true
+
+      # The packaged app is the only place the system webviews are exercised, and
+      # `--verify` is the only way to ask one whether it actually rendered. It
+      # needs a window server, which is why it runs here and not on Linux; it is
+      # advisory because a headless runner is not a desktop.
+      - name: Smoke-test the shell in the real webview
+        if: matrix.target == 'aarch64-apple-darwin'
+        continue-on-error: true
+        working-directory: ${{ env.SHELL_PATH }}
+        run: npm run verify
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: toolbit-${{ matrix.target }}
+          if-no-files-found: error
+          path: |
+            ${{ env.SHELL_PATH }}/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+            ${{ env.SHELL_PATH }}/src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app
+            ${{ env.SHELL_PATH }}/src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
+            ${{ env.SHELL_PATH }}/src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi
+            ${{ env.SHELL_PATH }}/src-tauri/target/${{ matrix.target }}/release/bundle/deb/*.deb
+            ${{ env.SHELL_PATH }}/src-tauri/target/${{ matrix.target }}/release/bundle/rpm/*.rpm
+            ${{ env.SHELL_PATH }}/src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage

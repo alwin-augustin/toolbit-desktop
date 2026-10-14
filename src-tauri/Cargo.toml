@@ -1,0 +1,27 @@
+[package]
+name = "toolbit-desktop"
+version = "0.1.0"
+edition = "2021"
+description = "Toolbit desktop host: native shell around the bundled web workspace"
+publish = false
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+# `mock_app` lets the shell's file queue be tested without a window.
+tauri = { version = "2", features = ["test"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

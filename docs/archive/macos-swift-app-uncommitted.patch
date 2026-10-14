@@ -1,0 +1,106 @@
+diff --git a/Sources/Toolbit/Shell.swift b/Sources/Toolbit/Shell.swift
+index 173c961..a959fa2 100644
+--- a/Sources/Toolbit/Shell.swift
++++ b/Sources/Toolbit/Shell.swift
+@@ -292,6 +292,7 @@ private struct FileDiagnosticAlert: ViewModifier {
+ 
+     func body(content: Content) -> some View {
+         @Bindable var model = model
++        #if compiler(>=6.3)
+         if #available(macOS 27, *) {
+             content.alert("Couldn’t Open File", item: $model.fileDiagnostic) { _ in
+                 Button("OK", role: .cancel) {}
+@@ -311,6 +312,19 @@ private struct FileDiagnosticAlert: ViewModifier {
+                 Text(verbatim: diagnostic)
+             }
+         }
++        #else
++        content.alert(
++            "Couldn’t Open File",
++            isPresented: $model.isPresentingFileDiagnostic,
++            presenting: model.fileDiagnostic
++        ) { _ in
++            Button("OK", role: .cancel) {
++                model.fileDiagnostic = nil
++            }
++        } message: { diagnostic in
++            Text(verbatim: diagnostic)
++        }
++        #endif
+     }
+ }
+ 
+diff --git a/Sources/ToolbitCore/Catalogue.swift b/Sources/ToolbitCore/Catalogue.swift
+index 060f951..581733e 100644
+--- a/Sources/ToolbitCore/Catalogue.swift
++++ b/Sources/ToolbitCore/Catalogue.swift
+@@ -13,7 +13,7 @@ public enum ToolCategory: String, CaseIterable, Sendable {
+     /// Display copy. The raw value is the canonical English source and the
+     /// localization key; it doubles as the stable search representation.
+     public var title: LocalizedStringResource {
+-        LocalizedStringResource(String.LocalizationValue(stringLiteral: rawValue), bundle: Catalogue.resources)
++        LocalizedStringResource(String.LocalizationValue(stringLiteral: rawValue), bundle: Catalogue.bundleDescription)
+     }
+ 
+     public var symbol: String {
+@@ -42,7 +42,7 @@ public enum WorkspaceKind: String, Sendable {
+     case generator = "Generator"
+ 
+     public var title: LocalizedStringResource {
+-        LocalizedStringResource(String.LocalizationValue(stringLiteral: rawValue), bundle: Catalogue.resources)
++        LocalizedStringResource(String.LocalizationValue(stringLiteral: rawValue), bundle: Catalogue.bundleDescription)
+     }
+ 
+     public var symbol: String {
+@@ -94,22 +94,22 @@ public struct ToolDefinition: Identifiable, Hashable, Sendable {
+ 
+     /// Display copy, localized through the module's resource bundle.
+     public var title: LocalizedStringResource {
+-        LocalizedStringResource(String.LocalizationValue(stringLiteral: titleText), bundle: Catalogue.resources)
++        LocalizedStringResource(String.LocalizationValue(stringLiteral: titleText), bundle: Catalogue.bundleDescription)
+     }
+     public var description: LocalizedStringResource {
+-        LocalizedStringResource(String.LocalizationValue(stringLiteral: descriptionText), bundle: Catalogue.resources)
++        LocalizedStringResource(String.LocalizationValue(stringLiteral: descriptionText), bundle: Catalogue.bundleDescription)
+     }
+     public var heroSummary: LocalizedStringResource {
+-        LocalizedStringResource(String.LocalizationValue(stringLiteral: heroSummaryText), bundle: Catalogue.resources)
++        LocalizedStringResource(String.LocalizationValue(stringLiteral: heroSummaryText), bundle: Catalogue.bundleDescription)
+     }
+     public var aboutInput: LocalizedStringResource {
+-        LocalizedStringResource(String.LocalizationValue(stringLiteral: aboutInputText), bundle: Catalogue.resources)
++        LocalizedStringResource(String.LocalizationValue(stringLiteral: aboutInputText), bundle: Catalogue.bundleDescription)
+     }
+     public var aboutOutput: LocalizedStringResource {
+-        LocalizedStringResource(String.LocalizationValue(stringLiteral: aboutOutputText), bundle: Catalogue.resources)
++        LocalizedStringResource(String.LocalizationValue(stringLiteral: aboutOutputText), bundle: Catalogue.bundleDescription)
+     }
+     public var aboutUseCases: LocalizedStringResource {
+-        LocalizedStringResource(String.LocalizationValue(stringLiteral: aboutUseCasesText), bundle: Catalogue.resources)
++        LocalizedStringResource(String.LocalizationValue(stringLiteral: aboutUseCasesText), bundle: Catalogue.bundleDescription)
+     }
+ 
+     init(
+@@ -190,7 +190,7 @@ public struct ClipboardSuggestion: Equatable, Sendable {
+     public let recommendedTools: [ToolDefinition]
+ 
+     public var formatTitle: LocalizedStringResource {
+-        LocalizedStringResource(String.LocalizationValue(stringLiteral: formatName), bundle: Catalogue.resources)
++        LocalizedStringResource(String.LocalizationValue(stringLiteral: formatName), bundle: Catalogue.bundleDescription)
+     }
+ 
+     public init(formatName: String, recommendedTools: [ToolDefinition]) {
+@@ -216,7 +216,12 @@ public struct CategoryGroup: Identifiable, Hashable, Sendable {
+ public enum Catalogue {
+     /// The package-owned resource bundle carrying the catalogue's localized
+     /// display copy.
+-    public static var resources: Bundle { #bundle }
++    public static var resources: Bundle { Bundle.module }
++
++    /// Bundle description compatible with macOS 14+ SDKs for `LocalizedStringResource`.
++    public static var bundleDescription: LocalizedStringResource.BundleDescription {
++        .atURL(resources.bundleURL)
++    }
+ 
+     public static let tools: [ToolDefinition] = [
+         .init(

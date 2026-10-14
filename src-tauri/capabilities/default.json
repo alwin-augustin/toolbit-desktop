@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Least privilege for the bundled workspace. It listens for the shell's menu, open-path and drag-drop events, and calls the app's own Rust commands — app commands are not behind the ACL, so no permission is needed for the file panels. `core:event:default` is therefore the whole surface: no window, webview, path, menu or dialog API is reachable from the page.",
+  "windows": ["main"],
+  "permissions": ["core:event:default"]
+}

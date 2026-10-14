@@ -1,0 +1,19 @@
+{
+  "name": "toolbit-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Toolbit desktop host — a Tauri shell around the web workspace",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "tauri": "tauri",
+    "check": "cargo check --manifest-path src-tauri/Cargo.toml",
+    "test": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "verify": "cargo run --release --manifest-path src-tauri/Cargo.toml -- --verify",
+    "icons": "tauri icon ../../Web/web/public/pwa-512x512.png"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.2"
+  }
+}
