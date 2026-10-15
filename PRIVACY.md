@@ -48,7 +48,7 @@
 
 ### 3.4 Build & bundling
 
-- `build:desktop` runs the web repo's desktop build, then `prune-dist.mjs`. Analytics env vars (`VITE_POSTHOG_*`) must not be set for desktop builds — and once the web removal lands, the scan (T3.2) makes this provable, not just true.
+- `build:desktop` runs the web repo's desktop build, then `prune-dist.mjs`. The web analytics channel was removed on 2026-10-16 (`Web/web/PRIVACY.md` §6) — there are no analytics env vars left to set — and the bundle scan (T3.2, planned) makes the no-telemetry property provable, not just true.
 
 ### 3.5 Release integrity
 
@@ -80,7 +80,7 @@ CI (`desktop.yml`) runs these across four targets on PRs and builds release arti
 
 | Date | Decision | Status |
 | --- | --- | --- |
-| 2026-10-16 | Product-wide no analytics — the web Option A removal applies to everything this shell bundles. | mirrors `Web/web/PRIVACY.md` §6 |
+| 2026-10-16 | Product-wide no analytics — the web Option A removal applies to everything this shell bundles. | implemented on the web side 2026-10-16 — mirrors `Web/web/PRIVACY.md` §6 |
 | 2026-10-16 | No Homebrew/signing work now; distribution stays DMG-first. | standing until revisited |
 
 ## 7. Escalation
