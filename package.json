@@ -11,6 +11,7 @@
     "check": "cargo check --manifest-path src-tauri/Cargo.toml",
     "test": "cargo test --manifest-path src-tauri/Cargo.toml",
     "verify": "cargo run --release --manifest-path src-tauri/Cargo.toml -- --verify",
+    "verify:editor": "node scripts/editor-check.mjs",
     "icons": "tauri icon ../../Web/web/public/pwa-512x512.png"
   },
   "devDependencies": {

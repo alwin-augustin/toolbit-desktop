@@ -200,6 +200,12 @@ fn remember_paths<R: tauri::Runtime>(app: &tauri::AppHandle<R>, argv: &[String])
 
 /// Runs inside the webview under `--verify`: reports what the workspace
 /// actually rendered, over the same IPC the app uses in normal operation.
+///
+/// Deliberately small. Anything beyond "did the interface mount, and can it reach
+/// the shell" belongs in `scripts/editor-check.mjs`, which drives the same build
+/// in Playwright's WebKit and can assert on computed styles: an injected script
+/// here reports nothing at all when `invoke` fails, which is indistinguishable
+/// from a page that never loaded.
 const VERIFY_PROBE: &str = r#"
 setTimeout(async () => {
   const report = (fields) => window.__TAURI__.core.invoke('verify_report', fields);
@@ -384,7 +390,23 @@ fn main() {
     }
 
     builder
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        // Size, position and maximized state are remembered; visibility and
+        // fullscreen deliberately are not, even though the plugin's default is
+        // `StateFlags::all()`. Closing the window hides it on macOS, so the last
+        // state written before a quit can be "invisible" — restoring that gives
+        // a running app with no window. Restoring fullscreen is almost as bad:
+        // the app then owns a whole Space every launch. The config's own window
+        // is the fallback, and it is visible and windowed.
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::SIZE
+                        | tauri_plugin_window_state::StateFlags::POSITION
+                        | tauri_plugin_window_state::StateFlags::MAXIMIZED
+                        | tauri_plugin_window_state::StateFlags::DECORATIONS,
+                )
+                .build(),
+        )
         .plugin(tauri_plugin_dialog::init())
         .manage(PendingOpen::default())
         .manage(KnownPaths::default())

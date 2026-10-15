@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Least privilege for the bundled workspace. It listens for the shell's menu, open-path and drag-drop events, and calls the app's own Rust commands — app commands are not behind the ACL, so no permission is needed for the file panels. `core:event:default` is therefore the whole surface: no window, webview, path, menu or dialog API is reachable from the page.",
+  "description": "Least privilege for the bundled workspace. The page only listens for the shell's menu, open-path and drag-drop events, so it gets the listen permissions rather than `core:event:default`, which also grants emit. App commands (`open_text_file`, `save_text_file`, `read_text_file`, `take_pending_open_path`) are not behind the ACL, so they need no entry here and the file panels stay reachable. No window, webview, path, menu, dialog or fs API is reachable from the page.",
   "windows": ["main"],
-  "permissions": ["core:event:default"]
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
 }

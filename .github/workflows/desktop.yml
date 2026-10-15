@@ -155,6 +155,21 @@ jobs:
         working-directory: ${{ env.SHELL_PATH }}
         run: npm run verify
 
+      # The CSP only shows up in a real engine, and Playwright's WebKit is the
+      # closest automatable stand-in for WKWebView. This asserts the workspace
+      # editor mounts, that CodeMirror's runtime-injected theme actually applied
+      # (the thing a too-strict style-src silently breaks) and that typing reaches
+      # the tool — with no `securitypolicyviolation` anywhere.
+      - name: Install the WebKit test engine
+        if: matrix.target == 'aarch64-apple-darwin'
+        working-directory: ${{ env.WEB_PATH }}
+        run: npx playwright install webkit
+
+      - name: Check the editor under the app CSP
+        if: matrix.target == 'aarch64-apple-darwin'
+        working-directory: ${{ env.SHELL_PATH }}
+        run: npm run verify:editor
+
       - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
