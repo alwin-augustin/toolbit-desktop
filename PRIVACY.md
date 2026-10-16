@@ -37,7 +37,7 @@
 
 ### 3.2 CSP
 
-- `connect-src 'self' ipc: http://ipc.localhost` — those are the shell's IPC endpoints, not the network. Keep the rest in the web CSP's spirit: `script-src 'self'`, `frame-src` / `object-src` / `base-uri` `'none'`.
+- `connect-src` carries the shell's IPC endpoints (`ipc:`, `http://ipc.localhost` — not the network) plus `https:`/`wss:` for the two bundled tools the user drives (API Request Builder, WebSocket tester — the web allowance, mirrored; F2). Keep the rest in the web CSP's spirit: `script-src 'self'`, `frame-src` / `object-src` / `base-uri` `'none'`.
 - `dangerousDisableAssetCspModification: ["style-src"]` is a CodeMirror accommodation — keep it scoped to `style-src` only.
 - Any web CSP change that affects the bundled app arrives here via `build:desktop`; verify both files together (drift test, planned).
 
@@ -72,6 +72,7 @@ CI (`desktop.yml`) runs these across four targets on PRs and builds release arti
 
 | Debt | Accepted because | Revisit when |
 | --- | --- | --- |
+| `https:`/`wss:` allowed in `connect-src` (web parity, F2) | the bundled network tools send to user-typed hosts; static CSP cannot scope per-route | a per-route CSP or bundled-tools isolation lands |
 | Unsigned/unnotarized DMGs; Homebrew cask quarantine workaround; placeholder checksums | no Developer ID certificate; deferred 2026-10-16 ("no Homebrew now") | signing is planned or the distribution channel requires it |
 | Capability/CSP snapshot + no-telemetry scan not yet automated | planned with the privacy test programme | T3.1/T3.2 land — then delete this row |
 | `style-src 'unsafe-inline'` allowance | CodeMirror runtime styles | editor styling changes |
@@ -81,6 +82,7 @@ CI (`desktop.yml`) runs these across four targets on PRs and builds release arti
 | Date | Decision | Status |
 | --- | --- | --- |
 | 2026-10-16 | Product-wide no analytics — the web Option A removal applies to everything this shell bundles. | implemented on the web side 2026-10-16 — mirrors `Web/web/PRIVACY.md` §6 |
+| 2026-10-16 | Mirror the web `connect-src` allowances (`https:`, `wss:`) so the bundled API/WebSocket tools work here exactly as in the browser. | implemented 2026-10-16 |
 | 2026-10-16 | No Homebrew/signing work now; distribution stays DMG-first. | standing until revisited |
 
 ## 7. Escalation
