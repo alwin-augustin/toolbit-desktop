@@ -53,15 +53,19 @@ jobs:
           - label: macOS (Apple silicon)
             os: macos-latest
             target: aarch64-apple-darwin
+            asset: macos-aarch64
           - label: macOS (Intel)
             os: macos-15-intel
             target: x86_64-apple-darwin
+            asset: macos-x64
           - label: Windows
             os: windows-latest
             target: x86_64-pc-windows-msvc
+            asset: windows-x64
           - label: Linux (x86_64)
             os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
+            asset: linux-x86_64
 
     steps:
       - name: Checkout the desktop shell
@@ -115,6 +119,17 @@ jobs:
         working-directory: ${{ env.SHELL_PATH }}
         run: npm ci
 
+      # `stage-model.mjs` (run by `beforeBuildCommand`) fetches the embedding
+      # weights from Hugging Face on every build. Keyed by the model reference
+      # in semantic.ts, the cache pays that download once per model revision
+      # instead of once per CI run — and keeps a hiccuping CDN from failing a
+      # bundle that is otherwise fine.
+      - name: Cache the staged semantic model
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.SHELL_PATH }}/node_modules/.cache/toolbit-semantic-model
+          key: semantic-model-${{ hashFiles(format('{0}/src/core/intent/semantic.ts', env.WEB_PATH)) }}
+
       # Cheap, and it is the only thing that compiles the shell in a shape the
       # bundling step does not: the unit tests cover the file-IO refusals and the
       # read allowlist.
@@ -144,6 +159,40 @@ jobs:
           tagName: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
           releaseName: ${{ startsWith(github.ref, 'refs/tags/v') && format('Toolbit {0}', github.ref_name) || '' }}
           releaseDraft: true
+
+      # The site links installers with `releases/latest/download/<name>` URLs,
+      # which stay valid only while the name is version-independent — while
+      # Tauri's names embed the version (`Toolbit_0.1.0_aarch64.dmg`). These
+      # copies are what those URLs point at. The versioned originals stay on
+      # the release too: they are what the release notes and any checksums
+      # name.
+      - name: Publish version-independent installer copies
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        working-directory: ${{ env.SHELL_PATH }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          bundle="src-tauri/target/${{ matrix.target }}/release/bundle"
+          out="$RUNNER_TEMP/release-assets"
+          mkdir -p "$out"
+
+          copy_first() { # <glob> <stable name>
+            local match
+            match=$(find "$bundle" -maxdepth 2 -name "$1" | head -n 1)
+            if [ -n "$match" ]; then cp "$match" "$out/$2"; fi
+          }
+
+          copy_first '*.dmg' 'Toolbit-${{ matrix.asset }}.dmg'
+          copy_first '*-setup.exe' 'Toolbit-${{ matrix.asset }}-setup.exe'
+          copy_first '*.msi' 'Toolbit-${{ matrix.asset }}.msi'
+          copy_first '*.deb' 'Toolbit-${{ matrix.asset }}.deb'
+          copy_first '*.AppImage' 'Toolbit-${{ matrix.asset }}.AppImage'
+          copy_first '*.rpm' 'Toolbit-${{ matrix.asset }}.rpm'
+
+          ls -l "$out"
+          gh release upload "${{ github.ref_name }}" "$out"/* --clobber
 
       # The packaged app is the only place the system webviews are exercised, and
       # `--verify` is the only way to ask one whether it actually rendered. It
