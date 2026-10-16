@@ -236,10 +236,14 @@ versioned bundles, and a follow-up step copies each bundle to a version-free
 name (`Toolbit-macos-aarch64.dmg`, `Toolbit-windows-x64-setup.exe`, …) and
 uploads that too.
 
-The version-free names are the site's contract: the about page links
-`toolbit.app/download/<platform>`, and the site's `_redirects` sends each one
+The version-free names are the site's contract: `toolbit.app/download` is a page
+that starts the build for the visitor's platform and lists all four, each
+`toolbit.app/download/<platform>` is a stable name the site's `_redirects` sends
 to the `toolbit-downloads` R2 bucket, served from `downloads.toolbit.app`
-(the free plan carries 10 GB with no egress fees).
+(the free plan carries 10 GB with no egress fees). The redirect table cannot
+read a user agent, so that decision is made in the browser
+(`Web/web/src/platform/downloads.ts`) — a new platform means a row there, a row
+in `public/_redirects`, and nothing else.
 
 Publishing the draft is what flips the downloads: the `Publish downloads`
 workflow runs on `release: published`, pulls the version-free copies back off
