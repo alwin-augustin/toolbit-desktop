@@ -228,6 +228,21 @@ injected styles stop applying. In the packaged app a blocked stylesheet looks
 like a plain-text editor — no mono font, no highlighting — rather than a broken
 page, which is exactly why it is worth an explicit check.
 
+## Releases
+
+A `v*` tag is what makes an installer downloadable: the tag run builds all
+four platforms, `tauri-action` creates the **draft** release carrying the
+versioned bundles, and a follow-up step copies each bundle to a version-free
+name (`Toolbit-macos-aarch64.dmg`, `Toolbit-windows-x64-setup.exe`, …) and
+uploads that too. Nothing downloads until the draft is published —
+`releases/latest` skips drafts.
+
+The version-free names are the site's contract: the about page links
+`toolbit.app/download/<platform>`, and the site's `_redirects` sends each one
+to `releases/latest/download/<name>`, GitHub's own "newest release" alias.
+That is why a release needs no site change — and why these names must not
+change without updating `public/_redirects` in the web repo.
+
 ## Limits and next steps
 
 - **The embedding model and its runtime ride in the bundle.** Every installer
