@@ -234,14 +234,23 @@ A `v*` tag is what makes an installer downloadable: the tag run builds all
 four platforms, `tauri-action` creates the **draft** release carrying the
 versioned bundles, and a follow-up step copies each bundle to a version-free
 name (`Toolbit-macos-aarch64.dmg`, `Toolbit-windows-x64-setup.exe`, …) and
-uploads that too. Nothing downloads until the draft is published —
-`releases/latest` skips drafts.
+uploads that too.
 
 The version-free names are the site's contract: the about page links
 `toolbit.app/download/<platform>`, and the site's `_redirects` sends each one
-to `releases/latest/download/<name>`, GitHub's own "newest release" alias.
-That is why a release needs no site change — and why these names must not
-change without updating `public/_redirects` in the web repo.
+to the `toolbit-downloads` R2 bucket, served from `downloads.toolbit.app`
+(the free plan carries 10 GB with no egress fees).
+
+Publishing the draft is what flips the downloads: the `Publish downloads`
+workflow runs on `release: published`, pulls the version-free copies back off
+the release and mirrors them into R2 under the same names. Until a human
+publishes, the site keeps serving the previous build — and any release needs
+no site change. That is also why these names must not change without updating
+`public/_redirects` in the web repo.
+
+The mirror authenticates with an R2 API token scoped to the one bucket, kept
+as the `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` repository secrets, plus
+the public `R2_ACCOUNT_ID` repository variable.
 
 ## Limits and next steps
 
