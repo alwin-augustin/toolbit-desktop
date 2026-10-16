@@ -1,0 +1,70 @@
+name: Publish downloads
+
+# Mirrors a published release's stable-named installers into the
+# toolbit-downloads R2 bucket. The site's /download/<platform> redirects
+# resolve to https://downloads.toolbit.app, this bucket's custom domain, so
+# this workflow is what "new release" means for the download links.
+#
+# It runs on `release: published` rather than on the tag push: the desktop
+# build creates the release as a draft, and publishing is the human's moment
+# of intent — downloads should not flip to a new build before it.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+# One mirror at a time; a superseded run is wasted bandwidth, not lost state,
+# because the next run reads the release fresh.
+concurrency:
+  group: publish-downloads
+  cancel-in-progress: true
+
+jobs:
+  mirror:
+    name: Mirror installers to Cloudflare R2
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Download the released installers
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release download "${{ github.event.release.tag_name }}" \
+            --repo "${{ github.repository }}" --dir assets \
+            --pattern 'Toolbit-macos-*' \
+            --pattern 'Toolbit-windows-*' \
+            --pattern 'Toolbit-linux-*'
+
+      # Writing `Toolbit-<platform>.<ext>` — the stable copies the build
+      # workflow uploads next to every versioned name — is what keeps the
+      # site's version-free download paths correct. The credentials are an R2
+      # API token scoped to this one bucket; the account ID is public and
+      # lives in a variable.
+      - name: Mirror to the toolbit-downloads bucket
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: https://${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(assets/*)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "no stable-named installers found on the release" >&2
+            exit 1
+          fi
+          # Stable names overwrite in place, so the CDN may hold a
+          # five-minute-old copy just after a release; five minutes of
+          # staleness beats a cache that never expires.
+          for file in "${files[@]}"; do
+            key="$(basename "$file")"
+            echo "mirroring ${key}"
+            aws s3 cp "$file" "s3://toolbit-downloads/${key}" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --cache-control "public, max-age=300"
+          done
